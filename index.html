@@ -1,0 +1,347 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Bitfields by Latency</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  </head>
+  <body>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/Latency/BitFields">View On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/Latency/BitFields/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/Latency/BitFields/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
+
+    <div class="wrapper">
+
+      <section>
+        <div id="title">
+          <h1>Bitfields</h1>
+          <p>.NET API library for enum extensions</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/Latency">Latency</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
+        </div>
+
+        <h1>
+<a name="bitfields" class="anchor" href="#bitfields"><span class="octicon octicon-link"></span></a>BitFields</h1>
+
+<p>.NET API library for enum extensions</p>
+
+<p><img height="391" alt="Sample image" src="http://bio-hazard.cx/bitfields/images/BitFields.jpg" width="600"></p>
+
+<ul>
+<li>
+<a href="#introduction">Introduction</a>
+  </li>
+<li>
+<a href="#background">Background</a>
+  </li>
+<li>
+<a href="#using">Using the code</a>
+  </li>
+<li>
+<a href="#points">Points of Interest</a>
+  </li>
+<li>
+<a href="#references">References</a> </li>
+  <li>
+<a href="#license">License</a> </li>
+</ul><p><a name="introduction"><h2>
+<a name="introduction" class="anchor" href="#introduction"><span class="octicon octicon-link"></span></a>Introduction</h2></a></p>
+
+<p>This article demonstrates a simple use of bit fields as flags for Windows forms. Bit fields allow packaging of data into simple structures, and they are particularly useful when bandwidth, memory or data storage is at a premium. This might not appear to be an issue with modern day equipment or every day applications, but we can save up to 16 times more memory and storage when using bit fields instead of other value types such as boolean.</p>
+
+<p><a name="background"><h2>
+<a name="background" class="anchor" href="#background"><span class="octicon octicon-link"></span></a>Background</h2></a></p>
+
+<h3>
+<a name="storage" class="anchor" href="#storage"><span class="octicon octicon-link"></span></a>Storage</h3>
+
+<p>Consider a boolean value in .NET:</p><div class="highlight highlight-cs"><pre><span class="kt">bool</span> <span class="n">bVal</span><span class="p">;</span>
+</pre></div>
+<p>Boolean value data types are stored as 16-bit (2-byte) numbers that can only be true or false. Consider an unsigned 16-bit number which ranges from 0 to 65535:</p><div class="highlight highlight-text"><pre>Decimal        Hexidecimal    Binary
+0              0x0000         0000000000000000
+65535          0xffff         1111111111111111
+</pre></div>
+<p>When numeric data types are converted to boolean values, 0 becomes false and all other values become true. When Boolean values are converted to numeric types, false becomes 0 and true becomes -1 (using a signed number).</p>
+
+<p>If we want to use a boolean value to represent a two-state value of a flag or setting in our program (true &lt;=&gt; on, false &lt;=&gt; off), then this would be stored as a 16-bit number.</p>
+
+<p>Consider using a binary digit to represent the same two-state value: (1 &lt;=&gt; on, 0 &lt;=&gt; off):</p><div class="highlight highlight-text"><pre>Decimal        Hexidecimal    Binary
+0              0x0000         0000000000000000
+1              0x0001         0000000000000001
+</pre></div>
+<p>We can use this same 16-bit number to represent 16 unique settings by inspecting each digit and determining if it is 1/on or 0/off:</p><div class="highlight highlight-text"><pre>Decimal        Hexidecimal    Binary
+1              0x0001         0000000000000001
+2              0x0002         0000000000000010
+4              0x0004         0000000000000100
+8              0x0008         0000000000001000
+16             0x0010         0000000000010000
+32             0x0020         0000000000100000
+64             0x0040         0000000001000000
+128            0x0080         0000000010000000
+256            0x0100         0000000100000000
+512            0x0200         0000001000000000
+1024           0x0400         0000010000000000
+2048           0x0800         0000100000000000
+4096           0x1000         0001000000000000
+8192           0x2000         0010000000000000
+16384          0x4000         0100000000000000
+32768          0x8000         1000000000000000
+</pre></div>
+<p>With only 16 settings, this might not appear to be an issue and one would more than likely store the settings as Boolean values, however, storing a history of those settings can quickly add up, and saving space by a factor of 16 can make a difference. Ever tried loading a 100MB file into memory and then manipulating it? How about a 1.6GB file?</p>
+
+<h3>
+<a name="understanding-bit-shifting-" class="anchor" href="#understanding-bit-shifting-"><span class="octicon octicon-link"></span></a>Understanding bit shifting &lt;&lt;</h3><div class="highlight highlight-cs"><pre><span class="n">f1</span> <span class="p">=</span> <span class="m">0</span><span class="n">x01</span>        <span class="c1">// 0x01        1    00000001</span>
+<span class="n">f2</span> <span class="p">=</span> <span class="n">f1</span> <span class="p">&lt;&lt;</span> <span class="m">1</span><span class="p">,</span>    <span class="c1">// 0x02        2    00000010</span>
+<span class="n">f3</span> <span class="p">=</span> <span class="n">f2</span> <span class="p">&lt;&lt;</span> <span class="m">1</span><span class="p">,</span>    <span class="c1">// 0x04        4    00000100</span>
+<span class="n">f4</span> <span class="p">=</span> <span class="n">f3</span> <span class="p">&lt;&lt;</span> <span class="m">1</span><span class="p">,</span>    <span class="c1">// 0x08        8    00001000</span>
+</pre></div>
+<p>Shifting to the Left or the Right.</p>
+<p>There are two operators:</p>
+<ul>
+<li>
+<code lang="cs">&lt;&lt;</code> for shifting a specified number of bits to the left (towards the "high order" bits)
+  </li>
+<li>
+<code lang="cs">&gt;&gt;</code> for shifting to the right. </li>
+</ul><p>If a shift operation causes some number of bits to go outside of an underlying data type, then those bits are discarded. Empty bit positions created by the shift operation are always filled with 0s in a left shift operation and in a positive right shift operation. If a negative number of bit places is requested in a right shift operation <code lang="cs">f2 &gt;&gt; -2</code>, then the vacated bit positions are filled with 1s.</p>
+<h3>
+<a name="understanding-bitwise-operations" class="anchor" href="#understanding-bitwise-operations"><span class="octicon octicon-link"></span></a>Understanding bitwise operations</h3>
+
+<p>Bitwise operations are used to manipulate the bit field, and determine if a specified flag is set. The following truth tables illustrate the truth values of some operations:</p><div class="highlight highlight-text"><pre>Mask OR Flag     Mask AND NOT Flag    Mask XOR Flag        
+0 | 0 = 0        0 &amp; ~0 = 0           0 ^ 0 = 0                     
+1 | 0 = 1        1 &amp; ~0 = 1           1 ^ 0 = 1                     
+0 | 1 = 1        0 &amp; ~1 = 0           0 ^ 1 = 1                     
+1 | 1 = 1        1 &amp; ~1 = 0           1 ^ 1 = 0
+</pre></div>
+<a name="using"><h2>
+<a name="using-the-code" class="anchor" href="#using-the-code"><span class="octicon octicon-link"></span></a>Using the code</h2></a>
+<p>The <code>BitField</code> class/structure uses an enumeration to define the flags in the bit field. The field can store up to 64 unique flags using the 64-bit unsigned <code lang="cs">ulong</code> value type. The flags can have any name, but be careful with the <code>Clear</code> flag as this has a special value that is used to clear and fill the entire bit field.</p><div class="highlight highlight-cs"><pre><span class="na">[Flags]</span>
+<span class="k">public</span> <span class="k">enum</span> <span class="n">Flag</span> <span class="p">:</span> <span class="kt">ulong</span> <span class="p">{</span>
+  <span class="n">Clear</span>  <span class="p">=</span> <span class="m">0</span><span class="n">x00</span><span class="p">,</span>
+  <span class="n">f1</span>     <span class="p">=</span> <span class="m">0</span><span class="n">x01</span><span class="p">,</span>
+  <span class="n">f2</span>     <span class="p">=</span> <span class="n">f1</span> <span class="p">&lt;&lt;</span> <span class="m">1</span><span class="p">,</span>
+  <span class="p">.</span> <span class="p">.</span> <span class="p">.</span>
+<span class="p">}</span>
+</pre></div>
+<p>Each <code>Flag</code> enumeration is a number that in binary form has one digit set to 1 and the rest set to 0. With this enumeration, there are exactly 64 distinct values with a single 1, and 2^64 (18446744073709551616) possible combinations of these 64 flags.</p>
+
+<p>Some points to make about <code lang="cs">[FlagsAttribute] == [Flags]</code>:</p>
+
+<ul>
+<li>An enumeration is treated as a bit field; that is, a mask comprised of a set of flags.
+  </li>
+<li>The results from bitwise operations are also bit fields.
+  </li>
+<li>Bit fields are generally used for lists of elements that might occur in combination, whereas enumeration constants are generally used for lists of mutually exclusive elements. Therefore, bit fields are designed to be combined to generate unnamed values, whereas enumerated constants are not. </li>
+</ul><p>The bit field is stored in the variable <code>_Mask</code>, and external access is provided through the public properties <code lang="cs">get</code> and <code lang="cs">set</code>.</p><div class="highlight highlight-cs"><pre><span class="k">private</span> <span class="kt">ulong</span> <span class="n">_Mask</span><span class="p">;</span>    
+<span class="k">public</span> <span class="kt">ulong</span> <span class="n">Mask</span> <span class="p">{</span>
+  <span class="k">get</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">_Mask</span><span class="p">;</span>
+  <span class="p">}</span>
+  <span class="k">set</span> <span class="p">{</span>
+    <span class="n">_Mask</span> <span class="p">=</span> <span class="k">value</span><span class="p">;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+<h3>
+<a name="methods" class="anchor" href="#methods"><span class="octicon octicon-link"></span></a>Methods</h3>
+<p>The <code>SetField</code> method sets the specified flag in the mask and turns all other flags off.</p>
+
+<ul>
+<li>Bits that are set to 1 in the flag will be set to one in the mask.
+  </li>
+<li>Bits that are set to 0 in the flag will be set to zero in the mask. </li>
+</ul><div class="highlight highlight-cs"><pre><span class="k">private</span> <span class="k">void</span> <span class="nf">SetField</span><span class="p">(</span><span class="n">Flag</span> <span class="n">flg</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">Mask</span> <span class="p">=</span> <span class="p">(</span><span class="kt">ulong</span><span class="p">)</span><span class="n">flg</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>This is particularly useful for setting all bits off using the <code>Flag.Clear</code> flag <code>SetField(Flag.Clear)</code>,</p><div class="highlight highlight-text"><pre>
+       Mask =  Flag.Clear
+&lt;=&gt;    Mask =  0000000000000000000000000000000000000000000000000000000000000000
+</pre></div>
+<p>or setting all bits on using the negation of the <code>Flag.Clear</code> flag <code>SetField(~Flag.Clear)</code>.</p><div class="highlight highlight-text"><pre>       Mask = ~Flag.Clear
+&lt;=&gt;    Mask = ~0000000000000000000000000000000000000000000000000000000000000000
+&lt;=&gt;    Mask =  1111111111111111111111111111111111111111111111111111111111111111
+</pre></div>
+<p>The <code>SetOn</code> method sets the specified flag(s) in the mask and leaves all other flags unchanged (using the binary bitwise inclusive OR operator).</p>
+<ul>
+<li>Bits that are set to 1 in the flag will be set to one in the mask.
+  </li>
+<li>Bits that are set to 0 in the flag will be unchanged in the mask. </li>
+</ul><div class="highlight highlight-cs"><pre><span class="k">public</span> <span class="k">void</span> <span class="nf">SetOn</span><span class="p">(</span><span class="n">Flag</span> <span class="n">flg</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">Mask</span> <span class="p">|=</span> <span class="p">(</span><span class="kt">ulong</span><span class="p">)</span><span class="n">flg</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>Since a flag has exactly one digit with a value of 1, and the rest of the digits 0, this will leave the mask unchanged, except for the position(s) where there is a value 1:</p>
+<p>Consider this operation on a random 16-bit Mask:</p><div class="highlight highlight-text"><pre>
+           1101001000011001
+    OR     F2
+    -------------------------
+&lt;=&gt;        1101001000011001
+    OR     0000000000000010
+    -------------------------
+&lt;=&gt;        1101001000011011
+</pre></div>
+<p>This has the same effect as placing the digit 1 into the appropriate position in the Mask to set the flag to on.</p>
+<p>The <code>SetOff</code> method sets the specified flag(s) off in the mask and leaves all other flags unchanged (using the unary bitwise complement NOT, followed by the binary bitwise AND operator).</p>
+<ul>
+<li>Bits that are set to 1 in the flag will be set to zero in the mask.
+  </li>
+<li>Bits that are set to 0 in the flag will be unchanged in the mask. </li>
+</ul><div class="highlight highlight-cs"><pre><span class="k">public</span> <span class="k">void</span> <span class="nf">SetOff</span><span class="p">(</span><span class="n">Flag</span> <span class="n">flg</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">Mask</span> <span class="p">&amp;=</span> <span class="p">~(</span><span class="kt">ulong</span><span class="p">)</span><span class="n">flg</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>Since a flag has exactly one digit with a value of 1, and the rest of the digits 0, this will leave the mask unchanged, except for the position(s) where there is a value 1:</p>
+<p>Consider this operation on a random 16-bit Mask:</p><div class="highlight highlight-text"><pre>
+            1101001000011001
+    AND    ~F1
+    --------------------------
+&lt;=&gt;         1101001000011001
+    AND    ~0000000000000001
+    --------------------------
+&lt;=&gt;         1101001000011001
+    AND     1111111111111110
+    --------------------------
+&lt;=&gt;         1101001000011000
+</pre></div>
+<p>This has the same effect as placing the digit 0 into the appropriate position in the Mask to set the flag to off.</p>
+<p>The <code>SetToggle</code> method toggles the specified flag and leaves all other bits unchanged (using the binary bitwise exclusive OR, XOR operator).</p>
+<ul>
+<li>Bits that are set to 1 in the flag will be toggled in the mask.
+  </li>
+<li>Bits that are set to 0 in the flag will be unchanged in the mask. </li>
+</ul><div class="highlight highlight-cs"><pre><span class="k">public</span> <span class="k">void</span> <span class="nf">SetToggle</span><span class="p">(</span><span class="n">Flag</span> <span class="n">flg</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">Mask</span> <span class="p">^=</span> <span class="p">(</span><span class="kt">ulong</span><span class="p">)</span><span class="n">flg</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>Since a flag has exactly one digit with a value of 1, and the rest of the digits 0, this will leave the mask unchanged, except for the position where there is a value 1:</p>
+<p>Consider this operation on a random 16-bit Mask:</p><div class="highlight highlight-text"><pre>
+           1101001000011001
+    XOR    F1
+    -------------------------
+&lt;=&gt;        1101001000011001
+    XOR    0000000000000001
+    -------------------------
+&lt;=&gt;        1101001000011000
+</pre></div>
+<p>This has the same effect as placing the opposite digit in the appropriate position in the Mask to toggle the flag. Using this flag, we don't have to remember the previous state of the flag.</p>
+<p>The <code>AnyOn</code> method checks if any of the specified flag(s) are set to on in the mask. It isolates the appropriate digit(s) and returns true if any are non zero, false otherwise.</p><div class="highlight highlight-cs"><pre><span class="k">public</span> <span class="kt">bool</span> <span class="nf">AnyOn</span> <span class="p">(</span><span class="n">Flag</span> <span class="n">flg</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="p">(</span><span class="n">Mask</span> <span class="p">&amp;</span> <span class="p">(</span><span class="kt">ulong</span><span class="p">)</span><span class="n">flg</span><span class="p">)</span> <span class="p">!=</span> <span class="m">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>The <code>AllOn</code> method checks if all of the specified flag(s) are set to on in the mask. It isolates the appropriate digit(s) and returns true if they all are non zero, false otherwise.</p><div class="highlight highlight-cs"><pre><span class="k">public</span> <span class="kt">bool</span> <span class="nf">AllOn</span> <span class="p">(</span><span class="n">Flag</span> <span class="n">flg</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="p">(</span><span class="n">Mask</span> <span class="p">&amp;</span> <span class="p">(</span><span class="kt">ulong</span><span class="p">)</span><span class="n">flg</span><span class="p">)</span> <span class="p">==</span> <span class="p">(</span><span class="kt">ulong</span><span class="p">)</span><span class="n">flg</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>The <code>IsEqual</code> method checks if all of the specified flag(s) are the same as in the mask. It isolates the appropriate digit(s) and returns true if they are all the same, false otherwise.</p><div class="highlight highlight-cs"><pre><span class="k">public</span> <span class="kt">bool</span> <span class="nf">IsEqual</span> <span class="p">(</span><span class="n">Flag</span> <span class="n">flg</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="n">Mask</span> <span class="p">==</span> <span class="p">(</span><span class="kt">ulong</span><span class="p">)</span><span class="n">flg</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>The <code>DecimalToFlag</code> method converts a decimal value to a <code>Flag FlagsAttribute</code> value. The input can be a index between 0 and 64, and the output will be the <code>Flag</code> enumeration corresponding to that index. All it does is take the index, and shift a bit that many positions.</p><div class="highlight highlight-cs"><pre><span class="k">public</span> <span class="k">static</span> <span class="n">Flag</span> <span class="nf">DecimalToFlag</span><span class="p">(</span><span class="kt">decimal</span> <span class="n">dec</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">Flag</span> <span class="n">flg</span> <span class="p">=</span> <span class="n">Flag</span><span class="p">.</span><span class="n">Clear</span><span class="p">;</span>
+  <span class="kt">ulong</span> <span class="n">tMsk</span> <span class="p">=</span> <span class="m">0</span><span class="p">;</span>
+  <span class="kt">byte</span> <span class="n">shift</span><span class="p">;</span>
+  <span class="k">try</span> <span class="p">{</span>
+    <span class="n">shift</span> <span class="p">=</span> <span class="p">(</span><span class="kt">byte</span><span class="p">)</span><span class="n">dec</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">shift</span> <span class="p">&gt;</span> <span class="m">0</span> <span class="p">&amp;&amp;</span> <span class="n">shift</span> <span class="p">&lt;=</span> <span class="m">64</span><span class="p">)</span>
+      <span class="n">tMsk</span> <span class="p">=</span> <span class="p">(</span><span class="kt">ulong</span><span class="p">)</span> <span class="m">0</span><span class="n">x01</span> <span class="p">&lt;&lt;</span> <span class="p">(</span><span class="n">shift</span> <span class="p">-</span> <span class="m">1</span><span class="p">);</span>
+    <span class="n">flg</span> <span class="p">=</span> <span class="p">(</span><span class="n">Flag</span><span class="p">)</span><span class="n">tMsk</span><span class="p">;</span>
+  <span class="p">}</span> <span class="k">catch</span> <span class="p">(</span><span class="n">OverflowException</span> <span class="n">e</span><span class="p">)</span> <span class="p">{</span>   <span class="c1">//Byte cast operation</span>
+    <span class="n">Console</span><span class="p">.</span><span class="n">WriteLine</span><span class="p">(</span><span class="s">"Exception caught in DecimalToFlag: {0}"</span><span class="p">,</span> <span class="n">e</span><span class="p">.</span><span class="n">ToString</span><span class="p">());</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="n">flg</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>The three methods <code>ToStringDec</code>, <code>ToStringHex</code>, <code>ToStringBin</code> return a string representation of the mask in decimal, hexadecimal, and binary notation respectively.</p>
+<h4>
+<a name="using-the-bitfield-classstructure" class="anchor" href="#using-the-bitfield-classstructure"><span class="octicon octicon-link"></span></a>Using the BitField class/structure.</h4>
+<p>Instantiating the object is straight forward:</p><div class="highlight highlight-cs"><pre><span class="n">BitField</span> <span class="n">bitField</span> <span class="p">=</span> <span class="k">new</span> <span class="n">BitField</span><span class="p">();</span>
+</pre></div>
+<p>When creating the <code lang="cs">struct</code> object using the <code lang="cs">new</code> operator, it gets created and the appropriate constructor is called. Unlike classes, <code lang="cs">struct</code>s can be instantiated without using the <code lang="cs">new</code> operator, so if you do not use <code lang="cs">new</code>, the fields will remain unassigned and the object cannot be used until all of the fields are initialized.</p>
+<p>This will create a new bit field and set all flags off. To set all flags on, you can call the method:</p><div class="highlight highlight-cs"><pre><span class="n">bitField</span><span class="p">.</span><span class="n">FillField</span><span class="p">();</span>
+</pre></div>
+<p>To set a flag, use:</p><div class="highlight highlight-cs"><pre><span class="n">bitField</span><span class="p">.</span><span class="n">SetOff</span><span class="p">(</span><span class="n">BitField</span><span class="p">.</span><span class="n">Flag</span><span class="p">.</span><span class="n">F1</span><span class="p">);</span>       <span class="c1">//Flag F1 off</span>
+<span class="n">bitField</span><span class="p">.</span><span class="n">SetOn</span><span class="p">(</span><span class="n">BitField</span><span class="p">.</span><span class="n">Flag</span><span class="p">.</span><span class="n">F1</span><span class="p">);</span>        <span class="c1">//Flag F1 on</span>
+<span class="n">bitField</span><span class="p">.</span><span class="n">SetToggle</span><span class="p">(</span><span class="n">BitField</span><span class="p">.</span><span class="n">Flag</span><span class="p">.</span><span class="n">F1</span><span class="p">);</span>    <span class="c1">//Flag F1 off</span>
+<span class="n">bitField</span><span class="p">.</span><span class="n">SetToggle</span><span class="p">(</span><span class="n">BitField</span><span class="p">.</span><span class="n">Flag</span><span class="p">.</span><span class="n">F1</span><span class="p">);</span>    <span class="c1">//Flag F1 on</span>
+</pre></div>
+<p>To check if a Flag is on, use:</p><div class="highlight highlight-cs"><pre><span class="k">if</span> <span class="p">(</span><span class="n">bitField</span><span class="p">.</span><span class="n">IsOn</span><span class="p">(</span><span class="n">BitField</span><span class="p">.</span><span class="n">Flag</span><span class="p">.</span><span class="n">f1</span><span class="p">))</span> <span class="p">{</span>
+  <span class="n">Console</span><span class="p">.</span><span class="n">WriteLine</span><span class="p">(</span><span class="s">"Flag F1 is On"</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+<a name="points"><h2>
+<a name="points-of-interest" class="anchor" href="#points-of-interest"><span class="octicon octicon-link"></span></a>Points of Interest</h2></a>
+<p>The mask value is a 64-bit number that can be stored, retrieved, or passed to other processes and applications that support 64-bit numbers. The <code>BitField</code> class/structure can then be used to retrieve and manipulate the mask. I did not find any resources that explains how bitwise operations are implemented in .NET, and if the operations are implemented efficiently. There might be ways to optimize the code but I have not found a good resource for this yet.</p>
+<p>It is also important to note that there is some overhead in creating a class object, as classes are reference types and structures are value types. If this is an issue then it is possible to implement the bit field operations directly in your code, but that would defeat the purpose of the object-oriented model.</p>
+<p>Another option to consider is using a structure instead of the class.</p>
+<p>A structure can be preferable when:</p>
+<ul>
+<li>You have a small amount of data less than 16-bytes, or 128-bits.
+  </li>
+<li>You perform a large number of operations on each instance and would incur performance degradation with heap management.
+  </li>
+<li>You have no need to inherit the structure or to specialize functionality among its instances.
+  </li>
+<li>You do not box and unbox the structure.
+  </li>
+<li>You are passing blittable data across a managed/unmanaged boundary. </li>
+</ul><p>A class is preferable when:</p>
+
+<ul>
+<li>You need to use inheritance and polymorphism.
+  </li>
+<li>You need to initialize one or more members at creation time.
+  </li>
+<li>You need to supply an un-parameterized constructor.
+  </li>
+<li>You need unlimited event handling support. </li>
+</ul><p>A similar bit field class and bit field structure are included in the source code and demo project. Depending on the use, it might be preferable to use one over the other. It would be interesting to time them and compare actual results to see under which circumstances and how much more efficiently the system can handle the structure.</p><a name="history"></a>
+<a name="references"><h2>
+<a name="references" class="anchor" href="#references"><span class="octicon octicon-link"></span></a>References</h2></a>
+<p>Edward Smoljanovic, 20 Apr 2004 - Masks and flags using bit fields in .NET</p>
+
+<p><a name="license"><h2>
+<a name="license" class="anchor" href="#license"><span class="octicon octicon-link"></span></a>License</h2></a></p>
+
+<div>
+  <p>
+    <a href="http://www.gnu.org/copyleft/gpl.html">GNU LESSER GENERAL PUBLIC LICENSE</a>
+    Version 3, 29 June 2007
+  </p>
+</div>
+      </section>
+
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-53012313-2");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+  </body>
+</html>
